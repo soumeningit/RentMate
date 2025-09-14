@@ -1,0 +1,219 @@
+<!-- <html>
+
+<head>
+    <title>MapmyIndia Plugin - Search Plugin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="desciption" content="Mapmyindia Search Plugin">
+    <script
+        src="https://apis.mapmyindia.com/advancedmaps/v1/62ea3f38-38da-4375-9c18-6d852a48d6a6/map_load?v=1.5"></script>
+    <script
+        src="https://apis.mapmyindia.com/advancedmaps/api/62ea3f38-38da-4375-9c18-6d852a48d6a6/map_sdk_plugins"></script>
+    <style>
+        body {
+            margin: 0
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        .infoCls_map {
+            margin-top: 60px !important;
+            min-width: 300px
+        }
+
+        #auto {
+            color: #000;
+            max-width: 99%;
+            width: 300px;
+            position: absolute;
+            z-index: 999;
+            font-size: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            outline: none !important;
+            top: 5px;
+            border-radius: 10px;
+            margin: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <input type="text" id="auto" name="auto" class="search-outer form-control as-input"
+        placeholder="Search places or eLoc's..." required="" spellcheck="false">
+    <script>
+        /*Map Initialization*/
+        var map = new MapmyIndia.Map('map', { center: [28.09, 78.3], zoom: 5, search: false });
+
+        /*Search plugin initialization*/
+        var optional_config = {
+            location: [28.61, 77.23],
+            // pod: 'City',
+            // bridge: true,
+            // tokenizeAddress: true,
+            // filter: 'cop:9QGXAM',
+            // distance: true,
+            // width: 300,
+            // height: 300
+        };
+        new MapmyIndia.search(document.getElementById("auto"), optional_config, callback);
+
+        /*CALL for fix text - LIKE THIS
+         * 
+         new MapmyIndia.search("agra",optional_config,callback);
+         * 
+         * */
+
+        var marker;
+        function callback(data) {
+            if (data) {
+                var dt = data[0];
+                if (!dt) return false;
+                var eloc = dt.eLoc;
+                var place = dt.placeName + ", " + dt.placeAddress;
+                /*Use elocMarker Plugin to add marker*/
+                if (marker) marker.remove();
+                marker = new MapmyIndia.elocMarker({ map: map, eloc: eloc, popupHtml: place, popupOptions: { openPopup: true } }).fitbounds();
+            }
+        }    
+    </script>
+</body>
+
+</html> -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nearby Medicine Shops</title>
+    <!-- React and ReactDOM -->
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.20.6/babel.min.js"></script>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MapmyIndia Interactive Map JS SDK -->
+    <script
+        src="https://apis.mapmyindia.com/advancedmaps/v1/62ea3f38-38da-4375-9c18-6d852a48d6a6/map_load?v=1.3"></script>
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const NearbyMedicineShops = () => {
+            const [shops, setShops] = useState([]);
+            const [location, setLocation] = useState({ lat: 28.6139, lng: 77.2090 }); // Default: New Delhi
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+            const [map, setMap] = useState(null);
+
+            // Initialize MapmyIndia map
+            useEffect(() => {
+                const mapInstance = new MapmyIndia.Map('map', {
+                    center: [location.lat, location.lng],
+                    zoom: 12,
+                });
+                setMap(mapInstance);
+                return () => mapInstance.remove();
+            }, []);
+
+            // Get user's location
+            useEffect(() => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            setLocation({
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude,
+                            });
+                        },
+                        (err) => {
+                            console.warn('Geolocation error:', err.message);
+                            setError('Unable to get your location. Using default location.');
+                        }
+                    );
+                } else {
+                    setError('Geolocation is not supported by your browser.');
+                }
+            }, []);
+
+            // Fetch nearby medicine shops from servlet
+            useEffect(() => {
+                if (!location.lat || !location.lng) return;
+
+                setLoading(true);
+                const url = `http://localhost:8080/your-webapp/nearby-pharmacies?lat=${location.lat}&lng=${location.lng}`;
+
+                fetch(url)
+                    .then((response) => {
+                        if (!response.ok) throw new Error('Failed to fetch nearby shops');
+                        return response.json();
+                    })
+                    .then((data) => {
+                        setShops(data.suggestedLocations || []);
+                        setLoading(false);
+
+                        // Add markers to the map
+                        if (map) {
+                            data.suggestedLocations?.forEach((shop) => {
+                                const marker = L.marker([shop.latitude, shop.longitude]).addTo(map);
+                                marker.bindPopup(`<b>${shop.placeName}</b><br>${shop.placeAddress}`);
+                            });
+                            map.setView([location.lat, location.lng], 12);
+                        }
+                    })
+                    .catch((err) => {
+                        setError(err.message);
+                        setLoading(false);
+                    });
+            }, [location, map]);
+
+            return (
+                <div className="container mx-auto p-4">
+                    <h1 className="text-2xl font-bold mb-4 text-center">Nearby Medicine Shops</h1>
+                    <div id="map" className="mb-4 rounded-lg shadow"></div>
+                    {loading && <p className="text-center text-gray-600">Loading...</p>}
+                    {error && <p className="text-center text-red-500">{error}</p>}
+                    {shops.length === 0 && !loading && !error && (
+                        <p className="text-center text-gray-600">No medicine shops found nearby.</p>
+                    )}
+                    <div className="grid gap-4">
+                        {shops.map((shop, index) => (
+                            <div
+                                key={index}
+                                className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition"
+                            >
+                                <h2 className="text-lg font-semibold">{shop.placeName}</h2>
+                                <p className="text-gray-600">{shop.placeAddress}</p>
+                                <p className="text-gray-500">Distance: {shop.distance} meters</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Render the component
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<NearbyMedicineShops />);
+    </script>
+</body>
+
+</html>
